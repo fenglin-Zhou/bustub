@@ -28,7 +28,8 @@ TEST(StarterTest, DISABLED_AddMatricesTest) {
   mat1_ptr->MatImport(&arr1[0]);
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      EXPECT_EQ(arr1[i * 3 + j], mat1_ptr->GetElem(i, j));
+      // std::cout << arr1[i * 3 + j] << ", " << mat1_ptr->GetElem(i, j) << "\n";
+      EXPECT_EQ(arr1[i * 3 + j], mat1_ptr->GetElem(i, j)) << arr1[i * 3 + j];
     }
   }
 
