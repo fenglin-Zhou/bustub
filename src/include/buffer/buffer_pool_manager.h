@@ -153,7 +153,7 @@ class BufferPoolManager {
   void FlushAllPagesImpl();
 
   /** Get a replacement page */
-  frame_id_t GetRepFrame();
+  frame_id_t GetAvailableFrame();
 
   /** Get frame_id by page_id */
   inline frame_id_t GetFrame(page_id_t page_id) {
