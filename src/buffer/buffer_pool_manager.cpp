@@ -33,6 +33,28 @@ BufferPoolManager::~BufferPoolManager() {
   delete[] pages_;
   delete replacer_;
 }
+frame_id_t BufferPoolManager::GetRepFrame() {
+  frame_id_t frame_id;
+
+  if (!free_list_.empty()) {
+    frame_id = free_list_.front();
+    free_list_.pop_front();
+    return frame_id;
+  }
+
+  if (replacer_->Victim(&frame_id)) {
+    Page *page_ptr = GetPage(frame_id);
+    page_id_t page_id = page_ptr->GetPageId();
+    if (page_ptr->IsDirty()) {
+      disk_manager_->WritePage(page_id, page_ptr->GetData());
+      page_ptr->pin_count_ = 0;
+    }
+    page_table_.erase(page_ptr->GetPageId());
+
+    return frame_id;
+  }
+  return INVALID_FRAME_ID;
+}
 
 Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 1.     Search the page table for the requested page (P).
@@ -42,7 +64,32 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 2.     If R is dirty, write it back to the disk.
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
-  return nullptr;
+  assert(page_id != INVALID_PAGE_ID);
+
+  std::unique_lock<std::mutex> lock(latch_);
+  frame_id_t frame_id = GetFrame(page_id);
+  Page *page_ptr = nullptr;
+  if (frame_id != INVALID_FRAME_ID) {
+    page_ptr = &pages_[frame_id];
+    page_ptr->pin_count_++;
+    replacer_->Pin(frame_id);
+    return page_ptr;
+  }
+
+  frame_id = GetRepFrame();
+  if (frame_id == INVALID_FRAME_ID) {
+    return nullptr;
+  }
+
+  page_table_.insert({page_id, frame_id});
+  page_ptr = pages_[frame_id];
+  disk_manager_->ReadPage(page_id, page_ptr->GetData());
+  page_ptr->page_id_ = page_id;
+  page_ptr->pin_count_++;
+  page_ptr->is_dirty_ = false;
+  replacer_->Pin(frame_id);
+
+  return page_ptr;
 }
 
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) { return false; }

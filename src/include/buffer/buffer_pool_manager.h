@@ -152,6 +152,24 @@ class BufferPoolManager {
    */
   void FlushAllPagesImpl();
 
+  /** Get a replacement page */
+  frame_id_t GetRepFrame();
+
+  /** Get frame_id by page_id */
+  inline frame_id_t GetFrame(page_id_t page_id) {
+    auto it = page_table_.find(page_id);
+    if (it == page_table_.end()) {
+      return INVALID_FRAME_ID;
+    }
+    return it->second;
+  }
+  /** Get page_id by frame_id */
+  inline Page *GetPage(frame_id_t frame_id) {
+    assert(frame_id != INVALID_FRAME_ID);
+    assert((size_t)frame_id < pool_size_);
+    return pages_ + frame_id;
+  }
+
   /** Number of pages in the buffer pool. */
   size_t pool_size_;
   /** Array of buffer pool pages. */
