@@ -152,9 +152,12 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   page_ptr->ResetAll();
   page_ptr->SetPageId(new_page_id);
   page_ptr->SetPinCount(1);
-  page_table_.insert({new_page_id, frame_id});
-  *page_id = new_page_id;
 
+  page_table_.insert({new_page_id, frame_id});
+  replacer_->Pin(frame_id);
+
+  disk_manager_->WritePage(page_ptr->GetPageId(), page_ptr->GetData());
+  *page_id = new_page_id;
   return page_ptr;
 }
 
@@ -178,7 +181,6 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
 
   disk_manager_->DeallocatePage(page_id);
   page_table_.erase(page_id);
-  replacer_->Pin(frame_id);
   page_ptr->ResetAll();
   free_list_.push_back(frame_id);
 
