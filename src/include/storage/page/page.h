@@ -52,10 +52,10 @@ class Page {
   inline void SetPinCount(int pin_count) { pin_count_ = pin_count; }
 
   /** pincount add one */
-  inline void AddPinCount() { ++pin_count_; }
+  inline int AddPinCount() { return ++pin_count_; }
 
   /** pincount substact one */
-  inline void SubPinCount() { --pin_count_; }
+  inline int SubPinCount() { return --pin_count_; }
 
   /** @return true if the page in memory has been modified from the page on disk, false otherwise */
   inline bool IsDirty() { return is_dirty_; }

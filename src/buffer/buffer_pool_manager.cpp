@@ -47,7 +47,7 @@ frame_id_t BufferPoolManager::GetAvailableFrame() {
     page_id_t page_id = page_ptr->GetPageId();
     if (page_ptr->IsDirty()) {
       disk_manager_->WritePage(page_id, page_ptr->GetData());
-      page_ptr->pin_count_ = 0;
+      page_ptr->SetPinCount(0);
     }
     page_table_.erase(page_ptr->GetPageId());
 
@@ -71,7 +71,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   Page *page_ptr = nullptr;
   if (frame_id != INVALID_FRAME_ID) {
     page_ptr = &pages_[frame_id];
-    page_ptr->pin_count_++;
+    page_ptr->AddPinCount();
     replacer_->Pin(frame_id);
     return page_ptr;
   }
@@ -85,14 +85,34 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   page_ptr = &pages_[frame_id];
   disk_manager_->ReadPage(page_id, page_ptr->GetData());
   page_ptr->SetPageId(page_id);
-  page_ptr->AddPinCount();
+  page_ptr->SetPinCount(1);
   page_ptr->SetDirty(false);
   replacer_->Pin(frame_id);
 
   return page_ptr;
 }
 
-bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) { return false; }
+bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
+  std::unique_lock<std::mutex> lock(latch_);
+  frame_id_t frame_id = GetFrame(page_id);
+  if (frame_id == INVALID_FRAME_ID) {
+    return false;
+  }
+
+  Page *page_ptr = GetPage(frame_id);
+  if (is_dirty) {
+    page_ptr->SetDirty(is_dirty);
+  }
+  int pin_count = page_ptr->GetPinCount();
+  if (pin_count <= 0) {
+    return false;
+  }
+  pin_count = page_ptr->SubPinCount();
+  if (pin_count == 0) {
+    replacer_->Unpin(frame_id);
+  }
+  return true;
+}
 
 bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
@@ -127,7 +147,15 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
     return nullptr;
   }
 
-  return nullptr;
+  Page *page_ptr = GetPage(frame_id);
+  page_id_t new_page_id = disk_manager_->AllocatePage();
+  page_ptr->ResetAll();
+  page_ptr->SetPageId(new_page_id);
+  page_ptr->SetPinCount(1);
+  page_table_.insert({new_page_id, frame_id});
+  *page_id = new_page_id;
+
+  return page_ptr;
 }
 
 bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
