@@ -36,10 +36,11 @@ INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreeInternalPage : public BPlusTreePage {
  public:
   // must call initialize method after "create" a new node
-  void Init(page_id_t page_id, page_id_t parent_id = INVALID_PAGE_ID, int max_size = INTERNAL_PAGE_SIZE);
+  void Init(page_id_t page_id, page_id_t parent_id = INVALID_PAGE_ID, int max_size = INTERNAL_PAGE_SIZE - 1);
 
   KeyType KeyAt(int index) const;
   void SetKeyAt(int index, const KeyType &key);
+  void SetValueAt(int index, const ValueType &value);
   int ValueIndex(const ValueType &value) const;
   ValueType ValueAt(int index) const;
 
@@ -47,6 +48,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void PopulateNewRoot(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
   int InsertNodeAfter(const ValueType &old_value, const KeyType &new_key, const ValueType &new_value);
   void Remove(int index);
+  void InsertAt(int index, const KeyType &new_key, const ValueType &new_value);
   ValueType RemoveAndReturnOnlyChild();
 
   // Split and Merge utility methods
@@ -56,6 +58,9 @@ class BPlusTreeInternalPage : public BPlusTreePage {
                         BufferPoolManager *buffer_pool_manager);
   void MoveLastToFrontOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
                          BufferPoolManager *buffer_pool_manager);
+
+  // Set parent page id
+  void SetParentToMe(page_id_t page_id, BufferPoolManager *buffer_pool_manager);
 
  private:
   void CopyNFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager);
