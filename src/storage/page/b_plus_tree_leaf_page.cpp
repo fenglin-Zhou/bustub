@@ -53,6 +53,14 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetPrevPageId(page_id_t prev_page_id) { prev_page_id_ = prev_page_id; }
 
 /**
+ * If the key existed return true;
+ */
+INDEX_TEMPLATE_ARGUMENTS
+bool B_PLUS_TREE_LEAF_PAGE_TYPE::CheckDuplicated(const KeyType &key, const KeyComparator &comparator) {
+  int index = KeyIndex(key, comparator);
+  return index < GetSize() && comparator(KeyAt(index), key) == 0;
+}
+/**
  * Helper method to find the first index i so that array[i].first >= key
  * NOTE: This method is only used when generating index iterator
  */

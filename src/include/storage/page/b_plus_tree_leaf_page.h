@@ -52,6 +52,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetPrevPageId(page_id_t prev_page_id);
   KeyType KeyAt(int index) const;
   ValueType ValueAt(int index) const;
+  bool CheckDuplicated(const KeyType &key, const KeyComparator &comparator);
   int KeyIndex(const KeyType &key, const KeyComparator &comparator) const;
   const MappingType &GetItem(int index);
 
