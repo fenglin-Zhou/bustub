@@ -12,17 +12,31 @@ namespace bustub {
  * set your own input parameters
  */
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::IndexIterator() = default;
+INDEXITERATOR_TYPE::IndexIterator()
+    : page_id_(INVALID_PAGE_ID), index_(-1), page_ptr_(nullptr), leaf_ptr_(nullptr), buffer_pool_manager_(nullptr) {}
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::IndexIterator(page_id_t page_id, int index, BufferPoolManager *bpm)
-    : page_id_(page_id), index_(index), buffer_pool_manager_(bpm) {
-  page_ptr_ = buffer_pool_manager_->FetchPage(page_id_);
-  leaf_ptr_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page_ptr_->GetData());
+INDEXITERATOR_TYPE::IndexIterator(Page *page_ptr, int index, BufferPoolManager *bpm)
+    : index_(index), page_ptr_(page_ptr), leaf_ptr_(nullptr), buffer_pool_manager_(bpm) {
+  if (page_ptr_ == nullptr) {
+    page_id_ = INVALID_PAGE_ID;
+    leaf_ptr_ = nullptr;
+  } else {
+    page_id_ = page_ptr_->GetPageId();
+    leaf_ptr_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page_ptr_->GetData());
+    if (index_ == leaf_ptr_->GetSize()) {
+      operator++();
+    }
+  }
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::~IndexIterator() = default;
+INDEXITERATOR_TYPE::~IndexIterator() {
+  if (page_id_ != INVALID_PAGE_ID) {
+    // page_ptr_->RUnlatch();
+    buffer_pool_manager_->UnpinPage(page_id_, false);
+  }
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 bool INDEXITERATOR_TYPE::isEnd() {
@@ -67,7 +81,7 @@ B_PLUS_TREE_LEAF_PAGE_TYPE *INDEXITERATOR_TYPE::GetLeafPage() {
   if (page_ptr == nullptr) {
     throw Exception(ExceptionType::OUT_OF_MEMORY, "INDEXITERATOR_TYPE::GetLeafPage() Out of memory in iterator");
   }
-  return reniterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page_ptr->GetData());
+  return reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page_ptr->GetData());
 }
 
 template class IndexIterator<GenericKey<4>, RID, GenericComparator<4>>;

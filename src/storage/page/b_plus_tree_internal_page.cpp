@@ -25,13 +25,12 @@ namespace bustub {
  * max page size
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id = INVALID_PAGE_ID,
-                                          int max_size = INTERNAL_PAGE_SIZE) {
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
+  SetPageType(IndexPageType::INTERNAL_PAGE);
+  SetSize(0);
   SetPageId(page_id);
   SetParentPageId(parent_id);
   SetMaxSize(max_size);
-  SetPageType(IndexPageType::INTERNAL_PAGE);
-  SetSize(0);
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
