@@ -123,6 +123,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
     LeafPage *new_page_ptr = Split<LeafPage>(leaf_page_ptr);
     leaf_page_ptr->MoveHalfTo(new_page_ptr);
     new_page_ptr->SetNextPageId(leaf_page_ptr->GetNextPageId());
+    new_page_ptr->SetPrevPageId(leaf_page_ptr->GetPageId());
     leaf_page_ptr->SetNextPageId(new_page_ptr->GetPageId());
 
     InsertIntoParent(leaf_page_ptr, new_page_ptr->KeyAt(0), new_page_ptr, transaction);
@@ -234,7 +235,33 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   if (IsEmpty()) {
     return;
   }
-  // Page *leaf_page_ptr = ;
+  assert(transaction != nullptr);
+  root_id_latch_.WLock();
+  transaction->AddIntoPageSet(nullptr);
+
+  Page *leaf_page_ptr = FindLeafPage(key, false);
+  page_id_t leaf_page_id = leaf_page_ptr->GetPageId();
+  LeafPage *leaf_ptr = reinterpret_cast<LeafPage *>(leaf_page_ptr->GetData());
+
+  if (!leaf_ptr->CheckDuplicated(key, comparator_)) {
+    root_id_latch_.WUnlock();
+    return;
+  }
+
+  int index = leaf_ptr->KeyIndex(key, comparator_);
+  leaf_ptr->RemoveAt(index);
+  bool ret = false;
+  if (leaf_ptr->GetSize() < leaf_ptr->GetMinSize()) {
+    ret = CoalesceOrRedistribute<LeafPage>(leaf_ptr, transaction);
+  }
+  if (ret) {
+    transaction->AddIntoDeletedPageSet(leaf_page_id);
+  } else {
+    leaf_page_ptr->SetDirty(true);
+  }
+
+  root_id_latch_.WUnlock();
+  buffer_pool_manager_->UnpinPage(leaf_page_id, true);
 }
 
 /*
@@ -247,6 +274,40 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
 bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
+  if (node->IsRootPage()) {
+    return AdjustRoot(node);
+  }
+  page_id_t parent_page_id = INVALID_PAGE_ID;
+  page_id_t pre_page_id = INVALID_PAGE_ID;
+  page_id_t next_page_id = INVALID_PAGE_ID;
+  Page *parent_page_ptr = nullptr;
+  Page *pre_page_ptr = nullptr;
+  Page *next_page_ptr = nullptr;
+  InternalPage *parent_internal_tree_ptr;
+  N *pre_node;
+  N *next_node;
+
+  parent_page_id = node->GetParentPageId();
+  parent_page_ptr = GetPage(parent_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute : out of memory!");
+  parent_internal_tree_ptr = reinterpret_cast<InternalPage *>(parent_page_ptr->GetData());
+
+  int node_index = parent_internal_tree_ptr->ValueIndex(node->GetPageId());
+  if (node_index > 0) {
+    pre_page_id = parent_internal_tree_ptr->ValueAt(node_index - 1);
+    pre_page_ptr = GetPage(pre_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute out of memory!");
+    pre_node = reinterpret_cast<N *>(pre_page_ptr->GetData());
+    if (pre_node->GetSize() > pre_node->GetMinSize()) {
+      Redistribute(pre_node, node, 1);
+      buffer_pool_manager_->UnpinPage(parent_page_id, true);
+      buffer_pool_manager_->UnpinPage(pre_page_id, true);
+      return false;
+    }
+  }
+  if (node_index < parent_internal_tree_ptr->GetSize() - 1) {
+    next_page_id = parent_internal_tree_ptr->ValueAt(node_index + 1);
+    next_page_ptr = GetPage(next_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute out of memory!");
+    next_node = reinterpret_cast<N *>(next_page_ptr->GetData());
+  }
   return false;
 }
 

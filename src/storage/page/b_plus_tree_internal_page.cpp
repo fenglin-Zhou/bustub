@@ -54,7 +54,9 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &valu
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
   int size = GetSize();
-  for (int i = 0; i <= size; ++i) {
+  // 内部节点一个key，有左右两个value算作两个。
+  // for (int i = 0; i <= size; ++i) {
+  for (int i = 0; i < size; ++i) {
     if (ValueAt(i) == value) {
       return i;
     }
