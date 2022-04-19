@@ -292,10 +292,13 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
   parent_internal_tree_ptr = reinterpret_cast<InternalPage *>(parent_page_ptr->GetData());
 
   int node_index = parent_internal_tree_ptr->ValueIndex(node->GetPageId());
+  // borrow value from previous node
   if (node_index > 0) {
     pre_page_id = parent_internal_tree_ptr->ValueAt(node_index - 1);
     pre_page_ptr = GetPage(pre_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute out of memory!");
     pre_node = reinterpret_cast<N *>(pre_page_ptr->GetData());
+
+    // If the borrow is successful, move the value and return
     if (pre_node->GetSize() > pre_node->GetMinSize()) {
       Redistribute(pre_node, node, 1);
       buffer_pool_manager_->UnpinPage(parent_page_id, true);
@@ -303,11 +306,47 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
       return false;
     }
   }
+  // Borrow from a later node
   if (node_index < parent_internal_tree_ptr->GetSize() - 1) {
     next_page_id = parent_internal_tree_ptr->ValueAt(node_index + 1);
     next_page_ptr = GetPage(next_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute out of memory!");
     next_node = reinterpret_cast<N *>(next_page_ptr->GetData());
+
+    // If the borrow is successful, move the value and return
+    if (next_node->GetSize() > next_node->GetMinSize()) {
+      Redistribute(next_node, node, 0);
+      buffer_pool_manager_->UnpinPage(parent_page_id, true);
+      if (node_index > 0) {
+        // Unmodified previous node, unpin page
+        buffer_pool_manager_->UnpinPage(pre_page_id, false);
+      }
+      buffer_pool_manager_->UnpinPage(next_page_id, true);
+      return false;
+    }
   }
+
+  bool ret = false;
+  if (pre_page_id != INVALID_PAGE_ID) {
+    ret = Coalesce(&pre_node, &node, &parent_internal_tree_ptr, node_index, transaction);
+    buffer_pool_manager_->UnpinPage(parent_page_id, true);
+    if (ret) {
+      transaction->AddIntoDeletedPageSet(parent_page_id);
+    }
+    buffer_pool_manager_->UnpinPage(pre_page_id, true);
+    if (next_page_id != INVALID_PAGE_ID) {
+      buffer_pool_manager_->UnpinPage(next_page_id, false);
+    }
+    return true;
+  }
+
+  ret = Coalesce(&node, &next_node, &parent_internal_tree_ptr, node_index + 1, transaction);
+  buffer_pool_manager_->UnpinPage(parent_page_id, true);
+  buffer_pool_manager_->UnpinPage(next_page_id, true);
+  transaction->AddIntoDeletedPageSet(next_page_id);
+  if (ret) {
+    transaction->AddIntoDeletedPageSet(parent_page_id);
+  }
+
   return false;
 }
 
@@ -328,6 +367,21 @@ template <typename N>
 bool BPLUSTREE_TYPE::Coalesce(N **neighbor_node, N **node,
                               BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> **parent, int index,
                               Transaction *transaction) {
+  if ((*node)->IsLeafPage()) {
+    LeafPage *temp_node = reinterpret_cast<LeafPage *>(*node);
+    LeafPage *temp_neighbor_node = reinterpret_cast<LeafPage *>(*neighbor_node);
+    temp_node->MoveAllTo(temp_neighbor_node);
+  } else {
+    InternalPage *temp_node = reinterpret_cast<InternalPage *>(*node);
+    InternalPage *temp_neighbor_node = reinterpret_cast<InternalPage *>(neighbor_node);
+    KeyType middle_key = (*parent)->KeyAt(index);
+    temp_node->MoveAllTo(temp_neighbor_node, middle_key, buffer_pool_manager_);
+  }
+
+  (*parent)->Remove(index);
+  if ((*parent)->GetSize() < (*parent)->GetMinSize()) {
+    return CoalesceOrRedistribute(*parent, transaction);
+  }
   return false;
 }
 
