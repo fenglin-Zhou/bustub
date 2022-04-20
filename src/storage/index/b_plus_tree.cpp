@@ -71,11 +71,20 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
+  // assert(transaction != nullptr);
+  bool ret;
+
+  // root_id_latch_.WLock();
+  // transaction->AddIntoPageSet(nullptr);
+
   if (IsEmpty()) {
     StartNewTree(key, value);
     return true;
+  } else {
+    ret = InsertIntoLeaf(key, value, transaction);
   }
-  return InsertIntoLeaf(key, value, transaction);
+  // root_id_latch_.WUnlock();
+  return ret;
 }
 /*
  * Insert constant key & value pair into an empty tree

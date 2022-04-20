@@ -86,7 +86,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCo
     return array[0].second;
   }
 
-  int left = 1;
+  int left = 0;
   int right = size;
   while (left < right - 1) {
     int mid = (left + right) / 2;
@@ -96,7 +96,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCo
       right = mid;
     } else if (compare_result == 1) {
       left = mid;
-    } else {
+    } else if (compare_result == 0) {
       return array[mid].second;
     }
   }

@@ -76,7 +76,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator
       right = mid;
     } else if (compare == 1) {
       left = mid + 1;
-    } else {
+    } else if (compare == 0) {
       return mid;
     }
   }
@@ -122,7 +122,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
     return 1;
   }
   int index = KeyIndex(key, comparator);
-  if (comparator(KeyAt(index), key) == 1) {
+  if (comparator(KeyAt(index), key) == 0) {
     return size;
   }
   InsertAt(index, key, value);
