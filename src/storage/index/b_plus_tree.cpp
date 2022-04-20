@@ -306,7 +306,7 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
       return false;
     }
   }
-  // Borrow from a later node
+  // Borrow from later node
   if (node_index < parent_internal_tree_ptr->GetSize() - 1) {
     next_page_id = parent_internal_tree_ptr->ValueAt(node_index + 1);
     next_page_ptr = GetPage(next_page_id, "BPLUSTREE_TYPE::CoalesceOrRedistribute out of memory!");
@@ -396,7 +396,43 @@ bool BPLUSTREE_TYPE::Coalesce(N **neighbor_node, N **node,
  */
 INDEX_TEMPLATE_ARGUMENTS
 template <typename N>
-void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {}
+void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {
+  page_id_t parent_page_id = node->GetParentPageId();
+  Page *parent_page_ptr = GetPage(parent_page_id, "BPLUSTREE_TYPE::Redistribute : out of memory!");
+  InternalPage *parent_tree_ptr = reinterpret_cast<InternalPage *>(parent_page_ptr->GetData());
+  // node is leaf
+  if (node->IsLeafPage()) {
+    LeafPage *leaf_node = reinterpret_cast<LeafPage *>(node);
+    LeafPage *neighbor_leaf_node = reinterpret_cast<LeafPage *>(neighbor_node);
+    if (index == 0) {
+      neighbor_leaf_node->MoveFirstToEndOf(leaf_node);
+      int index_insert = parent_tree_ptr->ValueIndex(neighbor_leaf_node->GetPageId());
+      parent_tree_ptr->SetKeyAt(index_insert, neighbor_leaf_node->KeyAt(0));
+    } else {
+      neighbor_leaf_node->MoveLastToFrontOf(leaf_node);
+      int index_insert = parent_tree_ptr->ValueIndex(leaf_node->GetPageId());
+      parent_tree_ptr->SetKeyAt(index_insert, leaf_node->KeyAt(0));
+    }
+  } else {  // node is internal node
+    InternalPage *internal_node = reinterpret_cast<InternalPage *>(node);
+    InternalPage *neighbor_internal_node = reinterpret_cast<InternalPage *>(neighbor_node);
+    if (index == 0) {
+      int index_node = parent_tree_ptr->ValueIndex(neighbor_internal_node->GetPageId());
+      KeyType middle_key = parent_tree_ptr->KeyAt(index_node);
+      KeyType next_middle_key = neighbor_internal_node->KeyAt(1);
+      neighbor_internal_node->MoveFirstToEndOf(internal_node, middle_key, buffer_pool_manager_);
+      parent_tree_ptr->SetKeyAt(index_node, next_middle_key);
+    } else {
+      int index_node = parent_tree_ptr->ValueIndex(internal_node->GetPageId());
+      KeyType middle_key = parent_tree_ptr->KeyAt(index_node);
+      KeyType next_middle_key = neighbor_internal_node->KeyAt(neighbor_internal_node->GetSize() - 1);
+      neighbor_internal_node->MoveLastToFrontOf(internal_node, middle_key, buffer_pool_manager_);
+      parent_tree_ptr->SetKeyAt(index_node, next_middle_key);
+    }
+  }
+  buffer_pool_manager_->UnpinPage(parent_page_id, true);
+}
+
 /*
  * Update root page if necessary
  * NOTE: size of root page can be less than min size and this method is only
@@ -408,7 +444,28 @@ void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {}
  * happend
  */
 INDEX_TEMPLATE_ARGUMENTS
-bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) { return false; }
+bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
+  if (old_root_node->GetSize() > 1) {
+    return false;
+  }
+  page_id_t new_root_id = INVALID_PAGE_ID;
+  if (old_root_node->IsLeafPage()) {
+    if (old_root_node->GetSize() == 1) {
+      return false;
+    }
+  } else {
+    InternalPage *old_internal_root_node = reinterpret_cast<InternalPage *>(old_root_node);
+    new_root_id = old_internal_root_node->RemoveAndReturnOnlyChild();
+
+    Page *new_root_page_ptr = GetPage(new_root_id, "BPLUSTREE_TYPE::AdjustRoot : out of memory!");
+    InternalPage *new_root_internal_ptr = reinterpret_cast<InternalPage *>(new_root_page_ptr);
+    new_root_internal_ptr->SetPageId(INVALID_PAGE_ID);
+    buffer_pool_manager_->UnpinPage(new_root_id, true);
+  }
+  root_page_id_ = new_root_id;
+  UpdateRootPageId(0);
+  return false;
+}
 
 /*****************************************************************************
  * INDEX ITERATOR
