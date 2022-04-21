@@ -119,7 +119,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
   // In practice this doesn't happen
   if (size == 0) {
     InsertAt(0, key, value);
-    return 1;
+    return GetSize();
   }
   int index = KeyIndex(key, comparator);
   if (comparator(KeyAt(index), key) == 0) {

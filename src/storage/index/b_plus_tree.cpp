@@ -244,18 +244,18 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   if (IsEmpty()) {
     return;
   }
-  assert(transaction != nullptr);
-  root_id_latch_.WLock();
-  transaction->AddIntoPageSet(nullptr);
+  // assert(transaction != nullptr);
+  // root_id_latch_.WLock();
+  // transaction->AddIntoPageSet(nullptr);
 
   Page *leaf_page_ptr = FindLeafPage(key, false);
   page_id_t leaf_page_id = leaf_page_ptr->GetPageId();
   LeafPage *leaf_ptr = reinterpret_cast<LeafPage *>(leaf_page_ptr->GetData());
 
-  if (!leaf_ptr->CheckDuplicated(key, comparator_)) {
-    root_id_latch_.WUnlock();
-    return;
-  }
+  // if (!leaf_ptr->CheckDuplicated(key, comparator_)) {
+  //   root_id_latch_.WUnlock();
+  //   return;
+  // }
 
   int index = leaf_ptr->KeyIndex(key, comparator_);
   leaf_ptr->RemoveAt(index);
@@ -264,12 +264,12 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
     ret = CoalesceOrRedistribute<LeafPage>(leaf_ptr, transaction);
   }
   if (ret) {
-    transaction->AddIntoDeletedPageSet(leaf_page_id);
+    // transaction->AddIntoDeletedPageSet(leaf_page_id);
   } else {
     leaf_page_ptr->SetDirty(true);
   }
 
-  root_id_latch_.WUnlock();
+  // root_id_latch_.WUnlock();
   buffer_pool_manager_->UnpinPage(leaf_page_id, true);
 }
 
