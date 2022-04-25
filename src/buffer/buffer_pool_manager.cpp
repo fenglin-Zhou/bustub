@@ -65,7 +65,10 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   assert(page_id != INVALID_PAGE_ID);
-
+  // if (page_id == INVALID_PAGE_ID) {
+  //   printf("1111\n");
+  //   return nullptr;
+  // }
   std::unique_lock<std::mutex> lock(latch_);
   frame_id_t frame_id = GetFrame(page_id);
   Page *page_ptr = nullptr;

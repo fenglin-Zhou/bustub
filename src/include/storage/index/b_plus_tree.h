@@ -33,10 +33,11 @@ namespace bustub {
  * (3) The structure should shrink and grow dynamically
  * (4) Implement index iterator for range scan
  */
-INDEX_TEMPLATE_ARGUMENTS
-class BPlusTree {
+INDEX_TEMPLATE_ARGUMENTS class BPlusTree {
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+
+  enum OpType { READ, INSERT, DELETE };
 
  public:
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
@@ -80,6 +81,14 @@ class BPlusTree {
   Page *FindLeafPage(const KeyType &key, bool leftMost = false);
 
  private:
+  void ReleaseLatch(Transaction *transaction, OpType op);
+
+  // void UnlatchAndUnpin(enum OpType op,Transaction *transaction);
+
+  bool CheckSafe(BPlusTreePage *tree_ptr, OpType op);
+
+  Page *FindLeafPageRW(const KeyType &key, Transaction *transaction, OpType op, bool leftMost = false);
+
   void StartNewTree(const KeyType &key, const ValueType &value);
 
   bool InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction = nullptr);
