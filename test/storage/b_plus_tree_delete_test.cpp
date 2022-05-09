@@ -50,7 +50,7 @@ TEST(BPlusTreeTests, DeleteTest1) {
     int64_t value = key & 0xFFFFFFFF;
     EXPECT_EQ(rids[0].GetSlotNum(), value);
   }
-  tree.Print(bpm);
+  // tree.Print(bpm);
 
   int64_t start_key = 1;
   int64_t current_key = start_key;
@@ -70,7 +70,6 @@ TEST(BPlusTreeTests, DeleteTest1) {
     tree.Remove(index_key, transaction);
   }
 
-  tree.Print(bpm);
   start_key = 2;
   current_key = start_key;
   int64_t size = 0;

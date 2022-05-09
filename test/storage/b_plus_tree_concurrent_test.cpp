@@ -258,10 +258,10 @@ TEST(BPlusTreeConcurrentTest, DeleteTest2) {
   // sequential insert
   std::vector<int64_t> keys = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   InsertHelper(&tree, keys);
-
+  // tree.Print(bpm);
   std::vector<int64_t> remove_keys = {1, 4, 3, 2, 5, 6};
   LaunchParallelTest(2, DeleteHelperSplit, &tree, remove_keys, 2);
-
+  // tree.Print(bpm);
   int64_t start_key = 7;
   int64_t current_key = start_key;
   int64_t size = 0;

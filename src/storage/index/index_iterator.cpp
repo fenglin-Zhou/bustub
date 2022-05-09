@@ -33,7 +33,7 @@ INDEXITERATOR_TYPE::IndexIterator(Page *page_ptr, int index, BufferPoolManager *
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() {
   if (page_id_ != INVALID_PAGE_ID) {
-    // page_ptr_->RUnlatch();
+    page_ptr_->RUnlatch();
     buffer_pool_manager_->UnpinPage(page_id_, false);
   }
 }
@@ -53,17 +53,18 @@ const MappingType &INDEXITERATOR_TYPE::operator*() {
 
 INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
   //   throw std::runtime_error("unimplemented");
-  if (leaf_ptr_ == nullptr) {
+  if (isEnd()) {
     return *this;
   }
 
-  if (index_ == leaf_ptr_->GetSize() - 1) {
+  if (index_ >= leaf_ptr_->GetSize() - 1) {
     page_id_t old_page_id = page_id_;
-    // Page *old_page_ptr = page_ptr_;
+    Page *old_page_ptr = page_ptr_;
 
     page_id_ = leaf_ptr_->GetNextPageId();
     leaf_ptr_ = GetLeafPage();
 
+    old_page_ptr->RUnlatch();
     buffer_pool_manager_->UnpinPage(old_page_id, false);
     index_ = 0;
   } else {
@@ -81,6 +82,7 @@ B_PLUS_TREE_LEAF_PAGE_TYPE *INDEXITERATOR_TYPE::GetLeafPage() {
   if (page_ptr == nullptr) {
     throw Exception(ExceptionType::OUT_OF_MEMORY, "INDEXITERATOR_TYPE::GetLeafPage() Out of memory in iterator");
   }
+  // if(!page_ptr->Try)
   return reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page_ptr->GetData());
 }
 

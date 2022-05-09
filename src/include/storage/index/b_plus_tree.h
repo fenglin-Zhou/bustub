@@ -87,6 +87,8 @@ INDEX_TEMPLATE_ARGUMENTS class BPlusTree {
 
   bool CheckSafe(BPlusTreePage *tree_ptr, OpType op);
 
+  void DeletePages(Transaction *transaction);
+
   Page *FindLeafPageRW(const KeyType &key, Transaction *transaction, OpType op, bool leftMost = false);
 
   void StartNewTree(const KeyType &key, const ValueType &value);

@@ -175,7 +175,7 @@ INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType *value, const KeyComparator &comparator) const {
   int index = KeyIndex(key, comparator);
   if (comparator(KeyAt(index), key) == 0) {
-    *value = array[index].second;
+    *value = ValueAt(index);
     return true;
   }
 
@@ -198,13 +198,16 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const 
   if (comparator(KeyAt(index), key) != 0) {
     return size;
   }
-  RemoveAt(index);
+  for (int i = index; i < size - 1; ++i) {
+    array[i] = array[i + 1];
+  }
   return size - 1;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAt(int index) {
-  for (int i = index; i < GetSize() - 2; ++i) {
+  // std::cout << index << "\n";
+  for (int i = index; i < GetSize() - 1; ++i) {
     array[i] = array[i + 1];
   }
   IncreaseSize(-1);
