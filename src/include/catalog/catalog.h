@@ -77,14 +77,35 @@ class Catalog {
    */
   TableMetadata *CreateTable(Transaction *txn, const std::string &table_name, const Schema &schema) {
     BUSTUB_ASSERT(names_.count(table_name) == 0, "Table names should be unique!");
-    return nullptr;
+    table_oid_t table_oid = next_table_oid_++;
+    std::unique_ptr<TableHeap> table(new TableHeap(bpm_, lock_manager_, log_manager_, txn));
+    std::unique_ptr<TableMetadata> table_meta(new TableMetadata(schema, table_name, std::move(table), table_oid));
+    TableMetadata *table_ptr = table_meta.get();
+
+    tables_.insert({table_oid, std::move(table_meta)});
+    names_.insert({table_name, table_oid});
+    index_names_.insert({table_name, std::unordered_map<std::string, index_oid_t>()});
+    return table_ptr;
   }
 
   /** @return table metadata by name */
-  TableMetadata *GetTable(const std::string &table_name) { return nullptr; }
+  TableMetadata *GetTable(const std::string &table_name) {
+    auto find = names_.find(table_name);
+    if (find == names_.end()) {
+      throw std::out_of_range("In catalog.h GetTable(const std::string &table_name)");
+    }
+    table_oid_t table_oid = find->second;
+    return tables_[table_oid].get();
+  }
 
   /** @return table metadata by oid */
-  TableMetadata *GetTable(table_oid_t table_oid) { return nullptr; }
+  TableMetadata *GetTable(table_oid_t table_oid) {
+    auto find = tables_.find(table_oid);
+    if (find == tables_.end()) {
+      throw std::out_of_range("In catalog.h GetTable(table_oid_t table_oid)");
+    }
+    return tables_[table_oid].get();
+  }
 
   /**
    * Create a new index, populate existing data of the table and return its metadata.
@@ -101,14 +122,54 @@ class Catalog {
   IndexInfo *CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name,
                          const Schema &schema, const Schema &key_schema, const std::vector<uint32_t> &key_attrs,
                          size_t keysize) {
-    return nullptr;
+    index_oid_t index_oid = next_index_oid_++;
+    IndexMetadata *index_mata_data = new IndexMetadata(index_name, table_name, &schema, key_attrs);
+    std::unique_ptr<Index> index_ptr(new BPLUSTREE_INDEX_TYPE(index_mata_data, bpm_));
+    std::unique_ptr<IndexInfo> index_info(
+        new IndexInfo(key_schema, index_name, std::move(index_ptr), index_oid, table_name, keysize));
+    IndexInfo *ptr = index_info.get();
+    indexes_.insert({index_oid, std::move(index_info)});
+    auto find = index_names_.find(table_name);
+    assert(find != index_names_.end());
+    find->second.insert({index_name, index_oid});
+    return ptr;
   }
 
-  IndexInfo *GetIndex(const std::string &index_name, const std::string &table_name) { return nullptr; }
+  IndexInfo *GetIndex(const std::string &index_name, const std::string &table_name) {
+    auto find_table = index_names_.find(table_name);
+    if (find_table == index_names_.end()) {
+      throw std::out_of_range("In catalog.h *GetIndex(const std::string &index_name, const std::string &table_name)\n");
+    }
+    auto &all_index = find_table->second;
+    auto find_index = all_index.find(index_name);
+    if (find_index == all_index.end()) {
+      throw std::out_of_range("In catalog.h *GetIndex(const std::string &index_name, const std::string &table_name)\n");
+    }
+    index_oid_t index_oid = find_index->second;
+    return indexes_[index_oid].get();
+  }
 
-  IndexInfo *GetIndex(index_oid_t index_oid) { return nullptr; }
+  IndexInfo *GetIndex(index_oid_t index_oid) {
+    auto find_index = indexes_.find(index_oid);
+    if (find_index == indexes_.end()) {
+      throw std::out_of_range("In catalog.h *GetIndex(index_oid_t index_oid)");
+    }
+    return indexes_[index_oid].get();
+  }
 
-  std::vector<IndexInfo *> GetTableIndexes(const std::string &table_name) { return std::vector<IndexInfo *>(); }
+  std::vector<IndexInfo *> GetTableIndexes(const std::string &table_name) {
+    std::vector<IndexInfo *> res{};
+    auto table = index_names_.find(table_name);
+    if (table == index_names_.end()) {
+      throw std::out_of_range("In catalog.h GetTableIndexes(const std::string &table_name)");
+    }
+    auto all_index = table->second;
+    for (const auto &pair : all_index) {
+      index_oid_t index_oid = pair.second;
+      res.push_back(indexes_[index_oid].get());
+    }
+    return res;
+  }
 
  private:
   [[maybe_unused]] BufferPoolManager *bpm_;
