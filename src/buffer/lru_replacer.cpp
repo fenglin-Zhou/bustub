@@ -27,7 +27,7 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
   frame_id_t last_frame = lru_list_.back();
   lru_map_.erase(last_frame);
   lru_list_.pop_back();
-  // no bug, But I think last_frame may be destroyed.
+  // no bug
   *frame_id = last_frame;
   return true;
 }
