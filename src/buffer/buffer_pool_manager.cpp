@@ -174,6 +174,7 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   std::unique_lock<std::mutex> lock(latch_);
   frame_id_t frame_id = GetFrame(page_id);
   if (frame_id == INVALID_FRAME_ID) {
+    disk_manager_->DeallocatePage(page_id);
     return true;
   }
 
@@ -185,6 +186,7 @@ bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   disk_manager_->DeallocatePage(page_id);
   page_table_.erase(page_id);
   page_ptr->ResetAll();
+  replacer_->Pin(frame_id);
   free_list_.push_back(frame_id);
 
   return false;
